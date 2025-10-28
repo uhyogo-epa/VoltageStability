@@ -3,7 +3,7 @@
 # case1_simulation.py
 """
 from juliacall import Main as jl
-import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 
 # Load julia module
@@ -13,7 +13,7 @@ VSE = jl.VoltageStabilityExample
 
 # Parameter settings (see Table 6.8)
 params = VSE.CaseParams()
-params.gen.Pm   =  200 / params.gen.Sbase_sys
+params.gen.Pm   =  300 / params.gen.Sbase_sys
 params.load.P0  = 1500 / params.gen.Sbase_sys
 params.load.Q0  = 0.5 * params.load.P0
 params.load.α   = 1.5
@@ -34,20 +34,43 @@ T_pre = 10.0
 T_all = 60.0      
 
 # Pre-contingency
-obs_A = VSE.reset(env)
-t_pre, obs_pre = VSE.simulate(env, T=T_pre, dt=dt)
+VSE.reset(env)
+obs_pre = VSE.simulate(env, T=T_pre, dt=dt)
+obs_pre = pd.DataFrame(dict(obs_pre)).set_index("t")
 
 # Post-contingency
 env.p.line.X14 *= 2 # one circuit tripping
-t_post, obs_post = VSE.simulate(env, T=T_all-T_pre, dt=dt)
-t, obs = jl.vcat(t_pre, t_post), jl.hcat(obs_pre, obs_post)
+obs_post = VSE.simulate(env, T=T_all-T_pre, dt=dt)
+obs_post = pd.DataFrame(dict(obs_post)).set_index("t")
+obs      = pd.concat([obs_pre, obs_post])
 
-# Plot results
-V2 = np.array(obs[0,:])
-plt.figure(figsize=(10, 6))
-plt.plot(t, V2)
-plt.xlabel("Time (s)")
-plt.ylabel("Bus 2 Voltage (pu)")
-plt.title("Voltage Stability Simulation (Case 1)")
-plt.grid(True)
-plt.show()
+######################################
+# Plot result 
+######################################
+selected_keys = ["V2", "V3", "V4", "r"]
+
+
+def plot_time_series(obs, selected_keys):
+
+    n = len(selected_keys)
+    fig, axes = plt.subplots(
+        n, 1, figsize=(8, 1.8 * n), sharex=True, constrained_layout=True
+    )
+
+    if n == 1:
+        axes = [axes]  # Ensure iterable
+
+    for ax, key in zip(axes, selected_keys):
+        if key not in obs.columns:
+            print(f"[Warning] Key '{key}' not found in DataFrame.")
+            continue
+        ax.plot(obs.index, obs[key], lw=1.5)
+        ax.set_ylabel(key, rotation=0, labelpad=25, fontsize=11)
+        ax.grid(True, linestyle="--", alpha=0.4)
+
+    axes[-1].set_xlabel("Time [s]", fontsize=11)
+    fig.suptitle("Voltage Stability Time Series", fontsize=13, y=1.02)
+    plt.show()
+
+plot_time_series(obs, selected_keys)
+

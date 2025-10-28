@@ -362,7 +362,7 @@ function ltc_update!(cp::CaseParams, V3, t)
     elseif ltc.armed
         if t >= ltc.t_next
             # Perform tap change
-            s = (err > 0) ? -1.0 : 1.0 # Lower r to increase V2 (tap on HV side)
+            s = (err > 0) ? 1.0 : -1.0 # Lower r to increase V3 (tap on HV side)
             ltc.r = clamp(ltc.r + s * ltc.Δr, ltc.rmin, ltc.rmax)
             
             # Check if still outside deadband to schedule next move
@@ -569,9 +569,17 @@ function observe(env::SimEnv)
     V2 = hypot(Vx2, Vy2)
     V3 = hypot(Vx3, Vy3)
     V4 = hypot(Vx4, Vy4)
-    return [V2, V3, V4, x[IDX.δ], x[IDX.Eqp], x[IDX.Vfd], env.p.ltc.r]
+    
+    return Dict(
+        :V2  => V2,
+        :V3  => V3,
+        :V4  => V4,
+        :δ   => x[IDX.δ],
+        :Eqp => x[IDX.Eqp],
+        :Vfd => x[IDX.Vfd],
+        :r   => env.p.ltc.r,
+    )    
 end
-const IDO = (V2=1, V3=2, V4=3, δ=4, Eqp=5, Vfd=6, r=7)
 
 
 """Reset environment (optionally randomize load level). Returns initial observation."""
@@ -609,8 +617,6 @@ _get(a, k::Symbol, default) = (try
         default
     end)
 
-voltage_deviation_penalty(obs) = (abs(obs[1]-1.0) + abs(obs[2]-1.0) + 0.2*abs(obs[3]-1.0))
-
 
 function step!(env::SimEnv; Δt::Float64=0.1, action=NamedTuple())
 
@@ -630,7 +636,7 @@ function step!(env::SimEnv; Δt::Float64=0.1, action=NamedTuple())
     end
 
     # Evolve LTC timer based on V3
-    V3 = observe(env)[IDO.V3]
+    V3 = observe(env)[:V3]
     ltc_update!(p, V3, env.t)
 
     # Integrate DAE from t to t+Δt (Sundials.IDA)
@@ -648,10 +654,9 @@ function step!(env::SimEnv; Δt::Float64=0.1, action=NamedTuple())
     env.du0 = Array(sol.du[end])
 
     obs = observe(env)
-    reward = -voltage_deviation_penalty(obs)
     done = false
     info = (;)
-    return obs, reward, done, info
+    return obs, done, info
 end
 
 
@@ -660,18 +665,34 @@ Returns times, matrix of observations.
 """
 function simulate!(env::SimEnv; T::Float64=60.0, dt::Float64=0.1)
     n = Int(floor(T/dt))
-    obs_dim = length(observe(env))
-    obs_hist = zeros(obs_dim, n+1)
-    t_hist = zeros(n+1)
-    obs_hist[:,1] .= observe(env)
-    t_hist[1] = env.t
-    for k in 1:n
-        obs, r, done, info = step!(env; Δt=dt)
-        obs_hist[:,k+1] .= obs
-        t_hist[k+1] = env.t
+    
+    # Initial observation
+    obs0 = observe(env) # assumed to be a Dict
+    cols = Dict{String, Vector{Float64}}()
+    cols["t"] = zeros(n + 1)
+    for k in keys(obs0)
+        cols[String(k)] = zeros(n + 1)
     end
-    return t_hist, obs_hist
+    cols["t"][1] = env.t
+    for (k, v) in obs0
+        cols[String(k)][1] = v
+    end
+    
+    # Time integration loop
+    for i in 1:n
+        # Perform one integration step
+        obs, done, _ = step!(env; Δt = dt)
+
+        # Record time and observation values
+        cols["t"][i + 1] = env.t
+        for (k, v) in obs
+            cols[String(k)][i + 1] = v
+        end
+    end
+
+    return cols
 end
+
 
 # ---------------------------
 # Exports
