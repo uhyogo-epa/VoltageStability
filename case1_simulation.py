@@ -31,7 +31,7 @@ env = VSE.SimEnv(params)
 #######################################
 dt = 0.1
 T_pre = 10.0
-T_all = 60.0      
+T_all = 200.0      
 
 # Pre-contingency
 VSE.reset(env)
@@ -47,12 +47,22 @@ obs      = pd.concat([obs_pre, obs_post])
 ######################################
 # Plot result 
 ######################################
-selected_keys = ["V2", "V3", "V4", "r"]
+#selected_keys = ["V2", "V3", "r", "δ", "Eq"]
+
+selected_keys = {
+    "V2": "auto", 
+    "V3": "auto", 
+    "r":  "auto", 
+    "δ":  (-3.14, 3.14), 
+    "Eq": "auto"
+    }
 
 
 def plot_time_series(obs, selected_keys):
 
-    n = len(selected_keys)
+    keys = list(selected_keys.keys())
+    n = len(keys)
+    
     fig, axes = plt.subplots(
         n, 1, figsize=(8, 1.8 * n), sharex=True, constrained_layout=True
     )
@@ -64,12 +74,20 @@ def plot_time_series(obs, selected_keys):
         if key not in obs.columns:
             print(f"[Warning] Key '{key}' not found in DataFrame.")
             continue
+        # plot
         ax.plot(obs.index, obs[key], lw=1.5)
         ax.set_ylabel(key, rotation=0, labelpad=25, fontsize=11)
         ax.grid(True, linestyle="--", alpha=0.4)
+        
+        # range
+        yr = selected_keys[key]
+        if isinstance(yr, tuple) and len(yr) == 2:
+           ax.set_ylim(*yr)
+        elif isinstance(yr, str) and yr.lower() == "auto":
+           pass
 
     axes[-1].set_xlabel("Time [s]", fontsize=11)
-    fig.suptitle("Voltage Stability Time Series", fontsize=13, y=1.02)
+    fig.suptitle("Voltage Stability Time Series (case1)", fontsize=13, y=1.02)
     plt.show()
 
 plot_time_series(obs, selected_keys)

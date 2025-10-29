@@ -169,8 +169,8 @@ function motor_currents(Vx3, Vy3, s, mp::MotorParams)
     Re, Xe = real(ReXe), imag(ReXe)
 
     den2 = Re^2 + (Xs + Xe)^2
-    IxM  = (-Vx3*Re + Vy3*(Xs + Xe)) / den2
-    IyM  = (-Vy3*Re - Vx3*(Xs + Xe)) / den2
+    IxM  = -(Vx3*Re + Vy3*(Xs + Xe)) / den2
+    IyM  = -(Vy3*Re - Vx3*(Xs + Xe)) / den2
     return IxM, IyM
 end
 
@@ -569,6 +569,14 @@ function observe(env::SimEnv)
     V2 = hypot(Vx2, Vy2)
     V3 = hypot(Vx3, Vy3)
     V4 = hypot(Vx4, Vy4)
+
+    # generator variables    
+    gen = env.p.gen
+    δ = x[IDX.δ]
+    Eqp = x[IDX.Eqp]
+    Ix2, Iy2 = gen_currents(Vx2, Vy2, δ, Eqp, gen)
+    id = Ix2 * sin(δ) - Iy2 * cos(δ)
+    Eq = (gen.Xd - gen.Xd_p)*id + Eqp
     
     return Dict(
         :V2  => V2,
@@ -577,6 +585,7 @@ function observe(env::SimEnv)
         :δ   => x[IDX.δ],
         :Eqp => x[IDX.Eqp],
         :Vfd => x[IDX.Vfd],
+        :Eq  => Eq,
         :r   => env.p.ltc.r,
     )    
 end
