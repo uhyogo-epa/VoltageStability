@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-# case1_simulation.py
+# case2_simulation.py
 """
 from juliacall import Main as jl
 import pandas as pd
@@ -13,7 +13,7 @@ VSE = jl.VoltageStabilityExample
 
 # Parameter settings (see Table 6.8)
 params = VSE.CaseParams()
-params.gen.Pm   =  300 / params.gen.Sbase_sys
+params.gen.Pm   =  450 / params.gen.Sbase_sys
 params.load.P0  = 1500 / params.gen.Sbase_sys
 params.load.Q0  = 0.5 * params.load.P0
 params.load.α   = 1.5
@@ -54,7 +54,7 @@ selected_keys = {
     "V3": "auto", 
     "r":  "auto", 
     "δ":  (-3.14, 3.14), 
-    "Eq": (1,4),
+    "Eq": (1,4)
     }
 
 
@@ -87,7 +87,7 @@ def plot_time_series(obs, selected_keys):
            pass
 
     axes[-1].set_xlabel("Time [s]", fontsize=11)
-    fig.suptitle("Voltage Stability Time Series (case1)", fontsize=13, y=1.02)
+    fig.suptitle("Voltage Stability Time Series (case2)", fontsize=13, y=1.02)
     plt.show()
 
 plot_time_series(obs, selected_keys)
